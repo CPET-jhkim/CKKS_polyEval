@@ -1,7 +1,7 @@
 # print.py
 from complexity import Complexity
 
-def print_poly(poly: list[float], title: str="다항식: ") -> None:
+def print_poly(poly: list[float], title: str="다항식:\t") -> None:
     print(f"{title}", end='')
     for i, coeff in enumerate(poly):
         if coeff != 0:
@@ -14,7 +14,7 @@ def print_poly(poly: list[float], title: str="다항식: ") -> None:
             else:
                 print(f"{mark}{coeff}(x^{i})", end='')
                 
-def print_poly_type(poly_type: list[str], title: str="타입: ") -> None:
+def print_poly_type(poly_type: list[str], title: str="타입:\t") -> None:
     if title:
         print(title, end='')
     print(f"({', '.join(poly_type)})")
@@ -44,3 +44,52 @@ def print_step(poly: list[float], i: int, poly_p: list[float], poly_q: list[floa
     print(f"Add:\t{comp_i.add}\t{comp_p.add}\t{comp_q.add}\t=>\t{comp_piq.add}")
     print(f"생성 차수: {made_powers} => {mp}")
     
+# 다항식 출력 문자열
+def pp(poly: list[float]) -> str:
+    res = ""
+    for i, coeff in enumerate(poly):
+        if coeff != 0:
+            if coeff < 0:
+                mark = ' '
+            elif coeff > 0:
+                mark = ' +'
+            if i == 0:
+                res += f"{mark}{coeff}"
+            elif i == 1:
+                res += f"{mark}{coeff}x"
+            elif coeff.is_integer():
+                res += f"{mark}{int(coeff)}(x^{i})"
+            else:
+                res += f"{mark}{coeff}(x^{i})"
+    return res
+
+def trim(coeff: list[float]) -> list[float]:
+        while coeff and coeff[-1] == 0:
+            coeff.pop()
+        return coeff
+    
+# 분해식에 따라 다항식 출력 문자열 반환
+def decomp_poly(poly: list[float], dcData: tuple) -> str:
+    multA, i, decomp_p, decomp_q = dcData
+    ###########        
+    # poly가 비어있는 경우
+    if poly == []:
+        return ""
+    # i=0
+    if i == 0:
+        return pp(poly)
+    else:
+        coeff_p = trim(poly[i:])
+        coeff_q = trim(poly[:i])
+        if multA and coeff_p:
+            leading_coeff = coeff_p[-1]
+            if leading_coeff != 0:
+                coeff_p = [c / leading_coeff for c in coeff_p]
+        mark = "" if poly[-1] < 0 else "+"
+        coeff = f"{poly[-1]}" if multA else ""
+        if i == 1:
+            res = f"{mark}{coeff}x"
+        else:
+            res = f"{mark}{coeff}x^{i}"
+            
+        return f"{res}[{decomp_poly(coeff_p, decomp_p)}]{decomp_poly(coeff_q, decomp_q)}"

@@ -9,7 +9,6 @@ class Poly:
     다항식 정보 클래스
     coeff: 계수 정보
     complexity: 연산복잡도 정보
-    decomp: 분해식 정보
     '''
     def __init__(self, coeff: list[float]):
         self.coeff = coeff
@@ -17,13 +16,7 @@ class Poly:
         self.coeff_type: list[str] = []
         self.check_type()
         self.complexity = Complexity()
-        '''
-        분해식 형태
-        (x^i) * p(x) + q(x)
-        저장은 [i, [], []]의 형태.
-        
-        '''
-        self.decomp = deque()
+
     
     # 다항식 각 계수의 타입 검사.
     # 0: 0, I: 정수, F: 소수

@@ -6,7 +6,7 @@ from print import print_step
 from util import *
 from collections import deque
 
-def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[int]]:
+def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], tuple[bool, int, tuple, tuple]]:
     max_deg = poly.deg
     ct = poly.coeff_type
     # =============================
@@ -16,7 +16,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[i
     '''
     ## 0-1) 빈 다항식 or 0차식 처리
     if max_deg <= 0:
-        return 0, Complexity(), made_powers
+        return Complexity(), made_powers, (False, 0, (), ())
     
     ## 0-2) 1차식 처리
     elif max_deg == 1:
@@ -25,7 +25,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[i
         comp_res.cmult = 0
         comp_res.pmult = 0 if ct[-1] == "I" else 1
         comp_res.add = 1 if ct[0] != "0" else 0
-        return 0, comp_res, made_powers
+        return comp_res, made_powers, (False, 0, (), ())
     
     # ==============================
     '''
@@ -57,7 +57,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[i
     rp = {i for i, c in enumerate(poly.coeff) if c != 0}
     comp_temp.add = len(rp) - 1
     
-    results = [(0, comp_temp, final_powers)]
+    results = [(comp_temp, final_powers, (False, 0, (), ()))]
     
     '''
     2. f(x) = (x^i)*p(x) + q(x)로 분해하는 경우
@@ -90,11 +90,11 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[i
             
             # 차수가 작은 다항식부터 연산
             if poly_p.deg < poly_q.deg:
-                j, comp_p, mp3 = calculate(poly_p, mp2)
-                k, comp_q, mp4 = calculate(poly_q, mp3)
+                comp_p, mp3, decomp_p = calculate(poly_p, mp2)
+                comp_q, mp4, decomp_q = calculate(poly_q, mp3)
             else:
-                j, comp_q, mp3 = calculate(poly_q, mp2)
-                k, comp_p, mp4 = calculate(poly_p, mp3)
+                comp_q, mp3, decomp_q = calculate(poly_q, mp2)
+                comp_p, mp4, decomp_p = calculate(poly_p, mp3)
                 
             # 계산복잡도 결합
             comp_pi = attach(comp_i, comp_p, 'x')
@@ -103,7 +103,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[i
             else:
                 comp_piq = comp_pi
                 
-            results.append((i, comp_piq, mp))
+            results.append((comp_piq, mp, (multA, i, decomp_p, decomp_q)))
 
     '''
     3. 최적의 결과 비교
@@ -112,13 +112,14 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Complexity, set[i
     '''
     best = results[0]
     for c in results[1:]:
-        if compare(best[1], c[1]) == 2:
+        if compare(best[0], c[0]) == 2:
             best = c    
+
     return best
 
-# 다항식에서 0이 아닌 값의 index를 반환하는 함수
-def required_powers(poly: list[float]) -> set[int]:
-    return {i for i, c in enumerate(poly) if c != 0}
+# # 다항식에서 0이 아닌 값의 index를 반환하는 함수
+# def required_powers(poly: list[float]) -> set[int]:
+#     return {i for i, c in enumerate(poly) if c != 0}
 
 
 # x^i를 구성하기 위한 모든 경우의 수를 탐색.
