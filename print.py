@@ -5,10 +5,10 @@ def print_poly(poly: list[float], title: str="다항식:\t") -> None:
     print(f"{title}", end='')
     print(pp(poly))
                 
-def print_poly_type(poly_type: list[str], title: str="타입:\t") -> None:
+def print_poly_type(poly_type: list[str], title: str=" 타입:\t") -> None:
     if title:
         print(title, end='')
-    print(f"({', '.join(poly_type)})")
+    print(f"({', '.join(reversed(poly_type))})")
 
 def print_poly_sep(i: int, poly_p: list[float], poly_q: list[float]) -> None:
     # 다항식 분해
@@ -43,13 +43,15 @@ def pp(poly: list[float]) -> str:
         if coeff == 0:
             continue
 
-        if coeff < 0 or (i == len(poly)-1 and i != 0):
+        if coeff < 0 or i == len(poly)-1:
             mark = ''
         elif coeff > 0:
             mark = '+'
         
         if coeff.is_integer():
             coeff = int(coeff)
+        else:
+            coeff = round(coeff, 2)
             
         if i == 0:
             res += f"{mark}{coeff}"
@@ -87,4 +89,4 @@ def decomp_poly(poly: list[float], dcData: tuple) -> str:
         else:
             res = f"{coeff}x^{i}"
             
-        return f"{res}[{decomp_poly(coeff_p, decomp_p)}]{decomp_poly(coeff_q, decomp_q)}"
+        return f"({res})[ {decomp_poly(coeff_p, decomp_p)} ] + ({decomp_poly(coeff_q, decomp_q)})"
