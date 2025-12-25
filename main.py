@@ -7,12 +7,12 @@ from polynomial import Poly
 
 if __name__ == '__main__':
     made_powers: set[int] = {0, 1}
-    coeff = [8, 2.6, 1.2, 1]
-    poly = Poly(coeff)
-    res = calculate(poly, made_powers)
-    res[0].print_params()
-    dd = decomp_poly(coeff, res[-1])
-    print(dd)
+    # coeff = [0, 0, 8.8, 10]
+    # poly = Poly(coeff)
+    # res = calculate(poly, made_powers)
+    # res[0].print_params()
+    # dd = decomp_poly(coeff, res[-1])
+    # print(dd)
     
     filename = "deg.txt"
     
@@ -27,10 +27,9 @@ if __name__ == '__main__':
                 for coeff in polys:
                     poly = Poly(coeff)
                     poly.print("poly")
-                    print()
-                    poly.print("type")
                     result = calculate(poly, made_powers)
                     print(f"분해식:\t{decomp_poly(coeff, result[-1])}")
+                    poly.print("type")
                     result[0].print_params()
                     
                     print('-'*20)

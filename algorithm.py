@@ -98,7 +98,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
                 
             # 계산복잡도 결합
             comp_pi = attach(comp_i, comp_p, 'x')
-            if poly_q != []:
+            if poly_q.coeff != []:
                 comp_piq = attach(comp_pi, comp_q, '+')
             else:
                 comp_piq = comp_pi
