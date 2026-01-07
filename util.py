@@ -3,6 +3,7 @@
 
 import random
 from itertools import product
+from math import log2, ceil
 
 def make_all_polys(max_deg: int) -> list[list[float]]:
     """
@@ -53,6 +54,21 @@ def make_all_polys(max_deg: int) -> list[list[float]]:
 
 
 # ax^i검증 -> a를 x^i에 붙이는 것이 효율적인가??
+# def check_axi_optimize(i: int, j: int) -> tuple[bool, bool]:
+#     '''
+#     판단기준
+#     x^i의 깊이 증가성
+#     x^j의 깊이 증가성
+    
+#     반환
+#     x^i에 a결합 여부, x^j에 a결합 여부
+#     '''
+#     di = ceil(log2(i)) < ceil(log2(i+1))
+#     dj = ceil(log2(j)) < ceil(log2(j+1))
+    
+#     if dj:
+        
+    
 def check_axi_optimize(i: int, j: int) -> bool:
     """
     ax^i * p(x) (p(x)의 대표 차수 x^j) 연산 시,

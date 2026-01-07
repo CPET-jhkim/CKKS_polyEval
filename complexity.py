@@ -14,10 +14,11 @@ class Complexity:
         self.add = add
         
     def print_params(self):
-        print(f"Depth:\t{self.depth}")
-        print(f"CMult:\t{self.cmult}")
-        print(f"PMult:\t{self.pmult}")
-        print(f"Add:\t{self.add}")
+        print(f"{'DCPA:':<8}{self.depth}|{self.cmult}|{self.pmult}|{self.add}")
+        # print(f"Depth:\t{self.depth}")
+        # print(f"CMult:\t{self.cmult}")
+        # print(f"PMult:\t{self.pmult}")
+        # print(f"Add:\t{self.add}")
         
 def attach(c1: Complexity, c2: Complexity, attach_type: str) -> Complexity:
     res = Complexity()

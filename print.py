@@ -1,18 +1,15 @@
 # print.py
 from complexity import Complexity
 
-def print_poly(poly: list[float], title: str="다항식:\t") -> None:
-    print(f"{title}", end='')
-    print(pp(poly))
+def print_poly(poly: list[float], title: str="poly:") -> None:
+    print(f"{title:<11}{pp(poly)}")
                 
-def print_poly_type(poly_type: list[str], title: str=" 타입:\t") -> None:
-    if title:
-        print(title, end='')
-    print(f"({', '.join(reversed(poly_type))})")
+def print_poly_type(poly_type: list[str], title: str="type:") -> None:
+    print(f"{title:<11}({' '.join(reversed(poly_type))})")
 
 def print_poly_sep(i: int, poly_p: list[float], poly_q: list[float]) -> None:
     # 다항식 분해
-    print("분해식: ", end='')
+    print("dcmp: ", end='')
     print(f"(x^{i})", end="")
     print("{", end='')
     print_poly(poly_p, "")
@@ -88,5 +85,6 @@ def decomp_poly(poly: list[float], dcData: tuple) -> str:
             res = f"{coeff}x"
         else:
             res = f"{coeff}x^{i}"
-            
-        return f"({res})[ {decomp_poly(coeff_p, decomp_p)} ] + ({decomp_poly(coeff_q, decomp_q)})"
+        
+        q = f" + ({decomp_poly(coeff_q, decomp_q)})" if coeff_q != [] else ""
+        return f"({res})[ {decomp_poly(coeff_p, decomp_p)} ]{q}" 

@@ -52,3 +52,72 @@ class Poly:
             print_poly(self.coeff)
         elif type == "type":
             print_poly_type(self.coeff_type)
+            
+
+class Decomp:
+    def __init__(self, coeff: list[float]):
+        self.coeff = coeff
+        self.multA = False
+        self.i = 0
+        self.dcmp_p = None
+        self.dcmp_q = None
+
+    def update(self, multA: bool, i: int, dcmp_p: "Decomp", dcmp_q: "Decomp"):
+        self.multA = multA
+        self.i = i
+        self.dcmp_p = dcmp_p
+        self.dcmp_q = dcmp_q
+        
+    def restore_dcmp(self) -> str:
+        ###########        
+        # poly가 비어있는 경우
+        if self.coeff == []:
+            return ""
+        # i=0
+        if self.i == 0:
+            return pp(self.coeff)
+        else:
+            coeff_p = self.dcmp_p.coeff
+            coeff_q = self.dcmp_q.coeff
+            if self.multA and coeff_p:
+                leading_coeff = coeff_p[-1]
+                if leading_coeff != 0:
+                    coeff_p = [c / leading_coeff for c in coeff_p]
+            coeff = f"{self.coeff[-1]}" if self.multA else ""
+            if self.i == 1:
+                res = f"{coeff}x"
+            else:
+                res = f"{coeff}x^{self.i}"
+            
+            q = f" + ({self.dcmp_q.restore_dcmp()})" if coeff_q != [] else ""
+            return f"({res})[ {self.dcmp_p.restore_dcmp()} ]{q}" 
+
+    def check_floats(self) -> int:
+        res = 0
+        for c in self.coeff:
+            if c == 0:
+                continue
+            elif c.is_integer():
+                continue
+            else:
+                res += 1
+        if self.dcmp_p is not None:
+            res += self.dcmp_p.check_floats()
+        if self.dcmp_q is not None:
+            res += self.dcmp_q.check_floats()
+
+        return res
+    
+    def check_depth(self) -> int:
+        res = 1
+        pNone = self.dcmp_p is not None
+        qNone = self.dcmp_q is not None
+
+        pDepth = 0
+        qDepth = 0
+        if pNone:
+            pDepth = self.dcmp_p.check_depth()
+        if qNone:
+            qDepth = self.dcmp_q.check_depth()
+            
+        return res+max(pDepth, qDepth)

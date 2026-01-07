@@ -1,12 +1,12 @@
 # algorithm.py
 from complexity import Complexity, attach, compare
-from polynomial import Poly
+from polynomial import Poly, Decomp
 from math import log2, ceil, sqrt
 from print import print_step
 from util import *
 from collections import deque
 
-def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], tuple[bool, int, tuple, tuple]]:
+def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], Decomp]:
     max_deg = poly.deg
     ct = poly.coeff_type
     # =============================
@@ -16,7 +16,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
     '''
     ## 0-1) 빈 다항식 or 0차식 처리
     if max_deg <= 0:
-        return Complexity(), made_powers, (False, 0, (), ())
+        return Complexity(), made_powers, Decomp(poly.coeff)
     
     ## 0-2) 1차식 처리
     elif max_deg == 1:
@@ -25,7 +25,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
         comp_res.cmult = 0
         comp_res.pmult = 0 if ct[-1] == "I" else 1
         comp_res.add = 1 if ct[0] != "0" else 0
-        return comp_res, made_powers, (False, 0, (), ())
+        return comp_res, made_powers, Decomp(poly.coeff)
     
     # ==============================
     '''
@@ -57,7 +57,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
     rp = {i for i, c in enumerate(poly.coeff) if c != 0}
     comp_temp.add = len(rp) - 1
     
-    results = [(comp_temp, final_powers, (False, 0, (), ()))]
+    results = [(comp_temp, final_powers, Decomp(poly.coeff))]
     
     '''
     2. f(x) = (x^i)*p(x) + q(x)로 분해하는 경우
@@ -85,9 +85,12 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
             add_count = len(ops_list)
             # x^i의 계산복잡도 정리
             comp_i = Complexity()
+            depth = ceil(log2(i + 1 if multA else i))
             pm = 1 if multA else 0
             comp_i.insert_value(depth, add_count, pm, 0)
             
+            # if poly_p.coeff == [0.6, 0, 0, 1]:
+            #     print("G")
             # 차수가 작은 다항식부터 연산
             if poly_p.deg < poly_q.deg:
                 comp_p, mp3, decomp_p = calculate(poly_p, mp2)
@@ -102,8 +105,10 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
                 comp_piq = attach(comp_pi, comp_q, '+')
             else:
                 comp_piq = comp_pi
-                
-            results.append((comp_piq, mp, (multA, i, decomp_p, decomp_q)))
+            
+            dcmp = Decomp(poly.coeff)
+            dcmp.update(multA, i, decomp_p, decomp_q)
+            results.append((comp_piq, mp, dcmp))
 
     '''
     3. 최적의 결과 비교
@@ -112,8 +117,20 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
     '''
     best = results[0]
     for c in results[1:]:
-        if compare(best[0], c[0]) == 2:
-            best = c    
+        res = compare(best[0], c[0])
+        if res == 2:
+            best = c
+        elif res == 0:
+            if best[-1].check_depth() < c[-1].check_depth():
+                best = c
+            # cf1 = best[-1].check_floats()
+            # cf2 = c[-1].check_floats()
+            # if cf1 < cf2:
+            #     continue
+            # elif cf1 == cf2:
+            #     if best[-1].check_depth() < c[-1].check_depth():
+            #         best = c
+                
 
     return best
 
