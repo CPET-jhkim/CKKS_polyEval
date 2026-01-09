@@ -12,13 +12,16 @@ class Complexity:
         self.cmult = cmult
         self.pmult = pmult
         self.add = add
-        
+    
+    # 크기 비교 - 작으면 연산복잡도가 더 높음.
+    def __lt__(self, other):
+        return (self.depth, self.cmult, self.pmult, self.add) > (other.depth, other.cmult, other.pmult, other.add)
+    
+    def __eq__(self, other):
+        return (self.depth, self.cmult, self.pmult, self.add) == (other.depth, other.cmult, other.pmult, other.add)
+    
     def print_params(self):
         print(f"{'DCPA:':<8}{self.depth}|{self.cmult}|{self.pmult}|{self.add}")
-        # print(f"Depth:\t{self.depth}")
-        # print(f"CMult:\t{self.cmult}")
-        # print(f"PMult:\t{self.pmult}")
-        # print(f"Add:\t{self.add}")
         
 def attach(c1: Complexity, c2: Complexity, attach_type: str) -> Complexity:
     res = Complexity()

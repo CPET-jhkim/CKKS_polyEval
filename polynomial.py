@@ -9,6 +9,7 @@ class Poly:
     다항식 정보 클래스
     coeff: 계수 정보
     complexity: 연산복잡도 정보
+    mp: 생성한 x^i차수 정보
     '''
     def __init__(self, coeff: list[float]):
         self.coeff = coeff
@@ -16,7 +17,7 @@ class Poly:
         self.coeff_type: list[str] = []
         self.check_type()
         self.complexity = Complexity()
-
+        self.mp: set[int] = set([0, 1])
     
     # 다항식 각 계수의 타입 검사.
     # 0: 0, I: 정수, F: 소수
@@ -55,18 +56,29 @@ class Poly:
             
 
 class Decomp:
-    def __init__(self, coeff: list[float]):
+    def __init__(self, coeff: list[float], comp: Complexity, mp: set[int]):
         self.coeff = coeff
         self.multA = False
+        self.compA = 0
         self.i = 0
+        self.comp = comp
+        self.mp = mp
         self.dcmp_p = None
         self.dcmp_q = None
 
     def update(self, multA: bool, i: int, dcmp_p: "Decomp", dcmp_q: "Decomp"):
         self.multA = multA
+        self.compA = 0 if multA is False else 1
         self.i = i
         self.dcmp_p = dcmp_p
         self.dcmp_q = dcmp_q
+    
+    # 크기 비교
+    def __lt__(self, other):
+        return (self.comp, self.compA, self.check_depth()) < (other.comp, other.compA, other.check_depth())
+    
+    def __eq__(self, other):
+        return (self.comp, self.compA, self.check_depth()) == (other.comp, other.compA, other.check_depth())
         
     def restore_dcmp(self) -> str:
         ###########        
@@ -110,14 +122,14 @@ class Decomp:
     
     def check_depth(self) -> int:
         res = 1
-        pNone = self.dcmp_p is not None
-        qNone = self.dcmp_q is not None
+        if self.i != 0:
+            res += ceil(log2(self.i+1))
 
         pDepth = 0
         qDepth = 0
-        if pNone:
+        if self.dcmp_p is not None:
             pDepth = self.dcmp_p.check_depth()
-        if qNone:
+        if self.dcmp_q is not None:
             qDepth = self.dcmp_q.check_depth()
             
         return res+max(pDepth, qDepth)

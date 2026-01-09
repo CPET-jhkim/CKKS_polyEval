@@ -2,10 +2,10 @@
 from complexity import Complexity
 
 def print_poly(poly: list[float], title: str="poly:") -> None:
-    print(f"{title:<11}{pp(poly)}")
+    print(f"{title:<8}{pp(poly)}")
                 
 def print_poly_type(poly_type: list[str], title: str="type:") -> None:
-    print(f"{title:<11}({' '.join(reversed(poly_type))})")
+    print(f"{title:<8}({' '.join(reversed(poly_type))})")
 
 def print_poly_sep(i: int, poly_p: list[float], poly_q: list[float]) -> None:
     # 다항식 분해

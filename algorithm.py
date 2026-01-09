@@ -6,7 +6,7 @@ from print import print_step
 from util import *
 from collections import deque
 
-def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], Decomp]:
+def calculate_step1(poly: Poly, made_powers: set[int]) -> tuple[int, Decomp]:
     max_deg = poly.deg
     ct = poly.coeff_type
     # =============================
@@ -16,7 +16,7 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
     '''
     ## 0-1) 빈 다항식 or 0차식 처리
     if max_deg <= 0:
-        return Complexity(), made_powers, Decomp(poly.coeff)
+        return 0, Decomp(poly.coeff, Complexity(), made_powers)
     
     ## 0-2) 1차식 처리
     elif max_deg == 1:
@@ -25,9 +25,70 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
         comp_res.cmult = 0
         comp_res.pmult = 0 if ct[-1] == "I" else 1
         comp_res.add = 1 if ct[0] != "0" else 0
-        return comp_res, made_powers, Decomp(poly.coeff)
+        res = Decomp(poly.coeff, comp_res, made_powers)
+        res_p = Decomp([poly.coeff[-1]], Complexity(), made_powers)
+        res_q = Decomp([poly.coeff[0]], Complexity(), made_powers)
+        # res.update(False, 1, None, None)
+        return 1, res
     
-    # ==============================
+    # 1. 분해하지 않고 연산하는 경우
+    # results = [cal_without_decomp(poly, made_powers)]
+
+    # 2. 분해하여 연산하는 경우
+    results = cal_with_decomp(poly, made_powers.copy())
+    
+    '''
+    3. 최적의 결과 비교
+        모든 분해식 결과는 (x^i 차수, 총 계산복잡도, 만들어진 x^i 차수들) tuple로 구성.
+        총 계산복잡도 기준으로 depth, cmult, pmult, add 순으로 가장 낮은 값을 검색.
+    '''
+    for i, dcmp in results:
+        print(f"{'dcmp:':<8}{dcmp.restore_dcmp()}")
+        dcmp.comp.print_params()
+        print(f"{'depth:':<8}{dcmp.check_depth()}")
+        
+    return compare_best(results)
+
+def calculate(poly: Poly, made_powers: set[int]) -> tuple[int, Decomp]:
+    max_deg = poly.deg
+    ct = poly.coeff_type
+    # =============================
+    '''
+    0. 분해가 필요없는 기초다항식 처리
+        빈 다항식의 경우 복잡도 0,0,0,0을 반환.
+    '''
+    ## 0-1) 빈 다항식 or 0차식 처리
+    if max_deg <= 0:
+        return 0, Decomp(poly.coeff, Complexity(), made_powers)
+    
+    ## 0-2) 1차식 처리
+    elif max_deg == 1:
+        comp_res = Complexity()
+        comp_res.depth = 0 if ct[-1] == "I" else 1
+        comp_res.cmult = 0
+        comp_res.pmult = 0 if ct[-1] == "I" else 1
+        comp_res.add = 1 if ct[0] != "0" else 0
+        res = Decomp(poly.coeff, comp_res, made_powers)
+        res_p = Decomp([poly.coeff[-1]], Complexity(), made_powers)
+        res_q = Decomp([poly.coeff[0]], Complexity(), made_powers)
+        # res.update(False, 1, None, None)
+        return 1, res
+    
+    # 1. 분해하지 않고 연산하는 경우
+    # results = [cal_without_decomp(poly, made_powers)]
+    
+    # 2. 분해하여 연산하는 경우
+    results = cal_with_decomp(poly, made_powers.copy())
+
+    '''
+    3. 최적의 결과 비교
+        모든 분해식 결과는 (x^i 차수, 총 계산복잡도, 만들어진 x^i 차수들) tuple로 구성.
+        총 계산복잡도 기준으로 depth, cmult, pmult, add 순으로 가장 낮은 값을 검색.
+    '''
+    return compare_best(results)
+
+# 분해하지 않을 때 연산복잡도 계산.
+def cal_without_decomp(poly: Poly, made_powers: set[int]) -> tuple[int, Decomp]:
     '''
     1. 분해하지 않는 경우
         x^0, x^1, ..., x^n 항을 모두 따로 계산할 때의 복잡도 측정.
@@ -36,6 +97,8 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
         pmult:  (0, 정수)가 아닌 계수의 개수
         add:    덧셈 횟수(= 계수가 0이 아닌 총 항의 개수)
     '''
+    max_deg = poly.deg
+    ct = poly.coeff_type
     comp_temp = Complexity()
     
     ## 1-1) depth
@@ -56,9 +119,11 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
     ## 1-4) add
     rp = {i for i, c in enumerate(poly.coeff) if c != 0}
     comp_temp.add = len(rp) - 1
-    
-    results = [(comp_temp, final_powers, Decomp(poly.coeff))]
-    
+
+    return 0, Decomp(poly.coeff, comp_temp, final_powers)
+
+# 분해할 때 연산복잡도 계산.
+def cal_with_decomp(poly: Poly, mp: set[int],  ):
     '''
     2. f(x) = (x^i)*p(x) + q(x)로 분해하는 경우
         A. (x^i)의 계산복잡도 측정(made_powers 업데이트)
@@ -68,76 +133,75 @@ def calculate(poly: Poly, made_powers: set[int]) -> tuple[Complexity, set[int], 
             (x^i) * p(x)의 경우 곱셈 -> depth(큰쪽) + 1, cmult(합) + 1
             (x^i)p(x) + q(x)의 경우 덧셈 -> add + 1        
     '''
-    for i in range(max_deg-1, 0, -1):
-        mp = made_powers.copy()
-        
+    max_deg = poly.deg
+    ct = poly.coeff_type
+    results = []
+    for i in range(max_deg, 0, -1):
         '''
         ax^i로 분해하는 조건
         1. 계수 a가 소수
         2. x^i , p(x) 중 x^i에 붙이는 것이 효율적인 경우
         '''
         multA = ct[max_deg] == "F" and check_axi_optimize(i, max_deg-i)
+                    
+        '''
+        multA가 True일 경우 ax^i, x^i 모든 경우의 수를 검색.
+        multA가 False인 경우 x^i인 경우의 수만 검색.
+        '''
+        if multA:
+            results.extend(subroutine(i, mp, poly, True))
             
-        xi_routes = cal_xi_routes(i, mp, multA)
-        poly_p, poly_q = poly.seperate(i, multA)
+        results.extend(subroutine(i, mp, poly, False))
+            
+    return results
+
+def subroutine(i, mp, poly, multA):
+    results = []
+    xi_routes = cal_xi_routes(i, mp, multA)
+    poly_p, poly_q = poly.seperate(i, multA)
+    
+    for depth, mp2, ops_list in xi_routes:
+        add_count = len(ops_list)
+        # x^i의 계산복잡도 정리
+        comp_i = Complexity()
+        depth = ceil(log2(i + 1 if multA else i))
+        pm = 1 if multA else 0
+        comp_i.insert_value(depth, add_count, pm, 0)
         
-        for depth, mp2, ops_list in xi_routes:
-            add_count = len(ops_list)
-            # x^i의 계산복잡도 정리
-            comp_i = Complexity()
-            depth = ceil(log2(i + 1 if multA else i))
-            pm = 1 if multA else 0
-            comp_i.insert_value(depth, add_count, pm, 0)
+        # 차수가 작은 다항식부터 연산
+        if poly_p.deg < poly_q.deg:
+            pi, decomp_p = calculate(poly_p, mp2 | mp)
+            qi, decomp_q = calculate(poly_q, decomp_p.mp)
+        else:
+            qi, decomp_q = calculate(poly_q, mp2 | mp)
+            pi, decomp_p = calculate(poly_p, decomp_q.mp)
             
-            # if poly_p.coeff == [0.6, 0, 0, 1]:
-            #     print("G")
-            # 차수가 작은 다항식부터 연산
-            if poly_p.deg < poly_q.deg:
-                comp_p, mp3, decomp_p = calculate(poly_p, mp2)
-                comp_q, mp4, decomp_q = calculate(poly_q, mp3)
-            else:
-                comp_q, mp3, decomp_q = calculate(poly_q, mp2)
-                comp_p, mp4, decomp_p = calculate(poly_p, mp3)
-                
-            # 계산복잡도 결합
-            comp_pi = attach(comp_i, comp_p, 'x')
-            if poly_q.coeff != []:
-                comp_piq = attach(comp_pi, comp_q, '+')
-            else:
-                comp_piq = comp_pi
+        # 계산복잡도 결합
+        if i == poly.deg:
+            val = 1 if poly.coeff_type[i] == "F" else 0
+            comp_pi = Complexity()
+            comp_pi.insert_value(comp_i.depth + val, comp_i.cmult, comp_i.pmult + val, comp_i.add)
+        else:
+            comp_pi = attach(comp_i, decomp_p.comp, 'x')
             
-            dcmp = Decomp(poly.coeff)
-            dcmp.update(multA, i, decomp_p, decomp_q)
-            results.append((comp_piq, mp, dcmp))
+        if poly_q.coeff != []:
+            comp_piq = attach(comp_pi, decomp_q.comp, '+')
+        else:
+            comp_piq = comp_pi
+        
+        dcmp = Decomp(poly.coeff, comp_piq, decomp_p.mp | decomp_q.mp)
+        dcmp.update(multA, i, decomp_p, decomp_q)
 
-    '''
-    3. 최적의 결과 비교
-        모든 분해식 결과는 (x^i 차수, 총 계산복잡도, 만들어진 x^i 차수들) tuple로 구성.
-        총 계산복잡도 기준으로 depth, cmult, pmult, add 순으로 가장 낮은 값을 검색.
-    '''
-    best = results[0]
-    for c in results[1:]:
-        res = compare(best[0], c[0])
-        if res == 2:
+        results.append((i, dcmp))
+    return results
+
+# 결과 데이터 중 최적값을 선택.
+def compare_best(datas: list[tuple[int, Decomp]]) -> tuple[int, Decomp]:
+    best = datas[0]
+    for c in datas[1:]:
+        if best > c:
             best = c
-        elif res == 0:
-            if best[-1].check_depth() < c[-1].check_depth():
-                best = c
-            # cf1 = best[-1].check_floats()
-            # cf2 = c[-1].check_floats()
-            # if cf1 < cf2:
-            #     continue
-            # elif cf1 == cf2:
-            #     if best[-1].check_depth() < c[-1].check_depth():
-            #         best = c
-                
-
     return best
-
-# # 다항식에서 0이 아닌 값의 index를 반환하는 함수
-# def required_powers(poly: list[float]) -> set[int]:
-#     return {i for i, c in enumerate(poly) if c != 0}
-
 
 # x^i를 구성하기 위한 모든 경우의 수를 탐색.
 # BFS방식으로 구현.
