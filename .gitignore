@@ -1,5 +1,8 @@
 # Python cache
 __pycache__/
 
+# Leagcy code folder
+legacy/
+
 # All text files
 *.txt

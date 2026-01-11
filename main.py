@@ -1,5 +1,5 @@
 # main.py
-from algorithm import calculate_step1
+from algorithm import calculate
 from contextlib import redirect_stdout
 from print import decomp_poly
 from util import make_all_polys
@@ -25,10 +25,6 @@ if __name__ == '__main__':
                 for coeff in polys:
                     poly = Poly(coeff)
                     poly.print("poly")
-                    result = calculate_step1(poly, made_powers)
-                    print("\nFINAL")
-                    print(f"{'dcmp:':<8}{result[-1].restore_dcmp()}")
-                    poly.print("type")
-                    result[1].comp.print_params()
+                    result = calculate(poly, made_powers)
                     
                     print('-'*50)

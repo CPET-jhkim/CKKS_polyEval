@@ -18,6 +18,7 @@ class Poly:
         self.check_type()
         self.complexity = Complexity()
         self.mp: set[int] = set([0, 1])
+        self.ops_list = None
     
     # 다항식 각 계수의 타입 검사.
     # 0: 0, I: 정수, F: 소수
@@ -31,7 +32,7 @@ class Poly:
                 self.coeff_type.append("F")
                 
     # 다항식 분해 -> 2개의 poly 클래스 반환.
-    def seperate(self, i: int, divide=False) -> tuple["Poly", "Poly"]:
+    def seperate(self, i: int, multA=False) -> tuple["Poly", "Poly"]:
         def trim(coeff: list[float]) -> list[float]:
             while coeff and coeff[-1] == 0:
                 coeff.pop()
@@ -40,7 +41,7 @@ class Poly:
         coeff_p = trim(self.coeff[i:])
         coeff_q = trim(self.coeff[:i])
         
-        if divide and coeff_p:
+        if multA and coeff_p:
             leading_coeff = coeff_p[-1]
             if leading_coeff != 0:
                 coeff_p = [c / leading_coeff for c in coeff_p]
@@ -59,7 +60,7 @@ class Decomp:
     def __init__(self, coeff: list[float], comp: Complexity, mp: set[int]):
         self.coeff = coeff
         self.multA = False
-        self.compA = 0
+        self.compA = 1
         self.i = 0
         self.comp = comp
         self.mp = mp
@@ -68,15 +69,15 @@ class Decomp:
 
     def update(self, multA: bool, i: int, dcmp_p: "Decomp", dcmp_q: "Decomp"):
         self.multA = multA
-        self.compA = 0 if multA is False else 1
+        self.compA = 1-multA
         self.i = i
         self.dcmp_p = dcmp_p
         self.dcmp_q = dcmp_q
     
     # 크기 비교
     def __lt__(self, other):
-        return (self.comp, self.compA, self.check_depth()) < (other.comp, other.compA, other.check_depth())
-    
+        return (self.comp, int(self.multA), self.check_depth()) < (other.comp, int(other.multA), other.check_depth())
+
     def __eq__(self, other):
         return (self.comp, self.compA, self.check_depth()) == (other.comp, other.compA, other.check_depth())
         
