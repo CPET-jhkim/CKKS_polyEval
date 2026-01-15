@@ -1,5 +1,5 @@
 # print.py
-from complexity import Complexity
+# from basic_class import Complexity
 
 def print_poly(poly: list[float], title: str="poly:") -> None:
     print(f"{title:<8}{pp(poly)}")
@@ -17,20 +17,20 @@ def print_poly_sep(i: int, poly_p: list[float], poly_q: list[float]) -> None:
     print_poly(poly_q, "")
     
 
-def print_step(poly: list[float], i: int, poly_p: list[float], poly_q: list[float],
-               comp_i: Complexity, comp_p: Complexity, comp_q: Complexity, comp_piq: Complexity,
-               made_powers: set[int], mp: set[int]):
-    print('#'*20)
-    print_poly(poly)
-    print()
-    print_poly_sep(i, poly_p, poly_q)
-    print()
-    print(f"복잡도: ")
-    print(f"Depth:\t{comp_i.depth}\t{comp_p.depth}\t{comp_q.depth}\t=>\t{comp_piq.depth}")
-    print(f"CMult:\t{comp_i.cmult}\t{comp_p.cmult}\t{comp_q.cmult}\t=>\t{comp_piq.cmult}")
-    print(f"PMult:\t{comp_i.pmult}\t{comp_p.pmult}\t{comp_q.pmult}\t=>\t{comp_piq.pmult}")
-    print(f"Add:\t{comp_i.add}\t{comp_p.add}\t{comp_q.add}\t=>\t{comp_piq.add}")
-    print(f"생성 차수: {made_powers} => {mp}")
+# def print_step(poly: list[float], i: int, poly_p: list[float], poly_q: list[float],
+#                comp_i: Complexity, comp_p: Complexity, comp_q: Complexity, comp_piq: Complexity,
+#                made_powers: set[int], mp: set[int]):
+#     print('#'*20)
+#     print_poly(poly)
+#     print()
+#     print_poly_sep(i, poly_p, poly_q)
+#     print()
+#     print(f"복잡도: ")
+#     print(f"Depth:\t{comp_i.depth}\t{comp_p.depth}\t{comp_q.depth}\t=>\t{comp_piq.depth}")
+#     print(f"CMult:\t{comp_i.cmult}\t{comp_p.cmult}\t{comp_q.cmult}\t=>\t{comp_piq.cmult}")
+#     print(f"PMult:\t{comp_i.pmult}\t{comp_p.pmult}\t{comp_q.pmult}\t=>\t{comp_piq.pmult}")
+#     print(f"Add:\t{comp_i.add}\t{comp_p.add}\t{comp_q.add}\t=>\t{comp_piq.add}")
+#     print(f"생성 차수: {made_powers} => {mp}")
     
 # 다항식 출력 문자열
 def pp(poly: list[float]) -> str:
