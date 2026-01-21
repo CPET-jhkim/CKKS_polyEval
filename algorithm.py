@@ -2,11 +2,11 @@ from basic_class import Poly, Decomp
 from math import log2, ceil
 from util import *
 
-def calculate(poly: Poly, made_powers: set[int], is_root: bool = True) -> Decomp | bool:
+def cal_polyEval(poly: Poly, made_powers: set[int] = {0, 1}, is_root: bool = True) -> Decomp | bool:
     max_deg = poly.deg
     ct = poly.coeff_type
     
-    # 0. 분해가 필요없는 기초다항식 처리
+    # 0. Basic polynomials(No Decomp.)
     if max_deg <= 0:
         res = Decomp(poly.coeff, Complexity())
         res.made_powers = {0}
@@ -23,7 +23,7 @@ def calculate(poly: Poly, made_powers: set[int], is_root: bool = True) -> Decomp
     
     results: list[Decomp] = []
     
-    # 1. 분해 없이 연산 가능한지 확인
+    # 1. Check evaluation availability without decomposition.
     if check_without_dcmp(made_powers, poly.coeff):
         comp_res = Complexity()
         val = 1 if poly.coeff_type[-1] == "F" else 0
@@ -35,8 +35,8 @@ def calculate(poly: Poly, made_powers: set[int], is_root: bool = True) -> Decomp
         res.made_powers = made_powers
         results.append(res)
         
-    # 2. 다항식 분해 후 복잡도 연산.
-    # i는 계수 중 0이 아닌 것들로만 구성.
+    # 2. Calculate complexity with decomposition.
+    # x^i will be selected only with non-zero coefficients'.
     def find_pi(coeff_type: list[str]):
         return [i for i, ct in enumerate(poly.coeff_type) if ct != "0" and i != 0]
     possible_i = find_pi(poly.coeff_type)
@@ -60,7 +60,7 @@ def calculate(poly: Poly, made_powers: set[int], is_root: bool = True) -> Decomp
             if type(res) == list:
                 results.extend(res)
 
-    # 정렬 후 반환
+    # Sort and return
     if len(results) == 0:
         return False
     
@@ -86,9 +86,9 @@ def process_decomposition(poly: Poly, xi: XI) -> list[Decomp] | bool:
     
     poly_p, poly_q = poly.seperate(xi.n, xi.multA)
     
-    decomp_p = calculate(poly_p, xi.made_powers, is_root=False)
+    decomp_p = cal_polyEval(poly_p, xi.made_powers, is_root=False)
     if type(decomp_p) == Decomp: 
-        decomp_q = calculate(poly_q, decomp_p.made_powers, is_root=False)
+        decomp_q = cal_polyEval(poly_q, decomp_p.made_powers, is_root=False)
 
         if decomp_q is False:
             return False

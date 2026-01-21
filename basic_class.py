@@ -1,11 +1,10 @@
-# class.py
+# basic_class.py
 from print import *
 from math import log2, ceil
-# from util import *
 
 class Complexity:
     '''
-    연산복잡도 클래스
+    Calculation complexity class
     '''
     def __init__(self):
         self.depth = 0
@@ -19,7 +18,7 @@ class Complexity:
         self.pmult = pmult
         self.add = add
     
-    # 크기 비교 - 작으면 연산복잡도가 더 높음.
+    # Comparison - smaller means higher complexity.
     def __lt__(self, other):
         return (self.depth, self.cmult, self.pmult, self.add) < (other.depth, other.cmult, other.pmult, other.add)
     
@@ -31,10 +30,10 @@ class Complexity:
         
 class Poly:
     '''
-    다항식 정보 클래스
-    coeff: 계수 정보
-    complexity: 연산복잡도 정보
-    mp: 생성한 x^i차수 정보
+    Polynomial info class
+    coeff: coefficient info
+    complexity: calculation complexity info.
+    mp: created x^i info.
     '''
     def __init__(self, coeff: list[float]):
         self.coeff = coeff
@@ -45,8 +44,8 @@ class Poly:
         # self.mp: set[int] = set([0, 1])
         # self.ops_list = None
     
-    # 다항식 각 계수의 타입 검사.
-    # 0: 0, I: 정수, F: 소수
+    # Check each coefficient's type.
+    # 0: 0, I: integer, F: float
     def check_type(self):
         for c in self.coeff:
             if c == 0:
@@ -56,7 +55,7 @@ class Poly:
             else:
                 self.coeff_type.append("F")
                 
-    # 다항식 분해 -> 2개의 poly 클래스 반환.
+    # Return two Poly instance by seperating polynomial.
     def seperate(self, i: int, multA=False) -> tuple["Poly", "Poly"]:
         def trim(coeff: list[float]) -> list[float]:
             while coeff and coeff[-1] == 0:
@@ -73,7 +72,7 @@ class Poly:
                 
         return Poly(coeff_p), Poly(coeff_q)
     
-    # 데이터 출력용
+    # print
     def print(self, type="poly"):
         if type == "poly":
             print_poly(self.coeff)
@@ -118,7 +117,6 @@ class Decomp:
         self.dcmp_q = dcmp_q
         self.made_powers |= xi.made_powers
         
-    # 크기 비교
     def __lt__(self, other):
         return (self.comp, int(self.xi.multA), self.check_depth()) < (other.comp, int(other.xi.multA), other.check_depth())
 
@@ -127,7 +125,6 @@ class Decomp:
         
     def restore_dcmp(self) -> str:
         ###########        
-        # poly가 비어있는 경우
         if self.coeff == []:
             return ""
         # i=0

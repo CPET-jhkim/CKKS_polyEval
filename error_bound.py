@@ -3,26 +3,22 @@ from basic_class import Decomp
 
 getcontext().prec = 128
 
-# ---------- helpers ----------
 def D(v) -> Decimal:
-    """안전한 Decimal 변환: float는 str 경유(이진 float 오차를 그대로 끌고오지 않게)"""
     if isinstance(v, Decimal):
         return v
     if isinstance(v, int):
         return Decimal(v)
-    # float, str 등
     return Decimal(str(v))
 
 def sqrtD(v) -> Decimal:
     return D(v).sqrt()
 
 
-# ---------- EB ----------
 class EB:
     def __init__(self, sigma: float, N: int, h: int, s: int):
-        # 전부 Decimal로 보관
-        self.Bc = B_clean(sigma, N, h)   # Decimal
-        self.Bs = B_scale(N, h)          # Decimal
+        # Convert into decimal
+        self.Bc = B_clean(sigma, N, h)
+        self.Bs = B_scale(N, h)
         self.scale = Decimal(2) ** int(s)
 
         self.B2 = Decimal(0)
@@ -30,29 +26,27 @@ class EB:
         self.B6 = Decimal(0)
 
 
-# ---------- bounds ----------
 def cal_bound(eb: EB, x: float, dcmp: Decomp) -> Decimal:
     """
-    Error bound calculation (Decimal 버전)
+    Error bound calculation
     """
     xd = D(x)
 
-    # 1) 모든 x^i 조합의 error bound 연산
+    # 1) Calculate every x^i error bound.
     xi_eb: dict[int, Decimal] = {0: Decimal(0), 1: Decimal(0)}
     for xi1, xi2 in dcmp.merge_route():
-        # x^xi1, x^xi2의 에러를 곱셈으로 합성
         xi_eb[xi1 + xi2] = eb_attach(eb, xd, xd, xi_eb[xi1], xi_eb[xi2], 'x')[1]
 
-    # 2) 실제 분해식의 error bound 연산(재귀)
+    # 2) Calculate f(x)'s error bound recursively.
     res = cal_dcmp_bound(dcmp, eb, xd, xi_eb)
     return res
 
 
 def cal_dcmp_bound(dcmp: Decomp, eb: EB, x: Decimal, xi_eb: dict[int, Decimal]) -> Decimal:
     """
-    Error bound of (x^i)p(x) + q(x). (Decimal 버전)
+    Error bound of (x^i)p(x) + q(x)
     """
-    # 0) 상수 다항식
+    # 0) max_deg = 0
     if len(dcmp.coeff) == 1:
         return Decimal(0)
 
@@ -81,18 +75,13 @@ def cal_dcmp_bound(dcmp: Decomp, eb: EB, x: Decimal, xi_eb: dict[int, Decimal]) 
     pt_xip, eb_xip = eb_attach(eb, pt_xi, pt_px, eb_xi, eb_px, 'x')
     pt_xipq, eb_xipq = eb_attach(eb, pt_xip, pt_qx, eb_xip, eb_qx, '+')
 
-    # 원 코드 유지: 마지막에 scale로 정규화
     return eb_xipq / eb.scale
 
 
 def evalP(x: Decimal, coeff: list) -> Decimal:
     """
-    다항식 평가: sum c_i * x^i
-    - coeff 원소가 float일 수 있으므로 Decimal로 변환
-    - Horner로 구현(정밀도/속도 모두 유리)
+    Polynomial Evaluation: sum c_i * x^i
     """
-    # coeff[0] + coeff[1] x + ... 형태를 Horner로
-    # 높은 차수부터 내려오기
     res = Decimal(0)
     for c in reversed(coeff):
         res = res * x + D(c)
@@ -100,9 +89,6 @@ def evalP(x: Decimal, coeff: list) -> Decimal:
 
 
 def eb_attach(eb: EB, x1, x2, err1, err2, op: str) -> tuple[Decimal, Decimal]:
-    """
-    모든 입력/출력을 Decimal로 처리
-    """
     bs = D(eb.Bs)
     scale = eb.scale
 
@@ -130,7 +116,6 @@ def eb_attach(eb: EB, x1, x2, err1, err2, op: str) -> tuple[Decimal, Decimal]:
         return Decimal(-99), Decimal(-99)
 
 
-# ---------- B bounds (Decimal) ----------
 def B_clean(sigma: float, N: int, h: int) -> Decimal:
     sd = D(sigma)
     Nd = D(N)
