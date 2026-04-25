@@ -1,9 +1,11 @@
 # util.py
-
 import random
 from itertools import product
 from math import log2, ceil
-from basic_class import Complexity, Poly, XI
+try:
+    from basic_class import Complexity, Poly, XI
+except:
+    from .basic_class import Complexity, Poly, XI
 
 def make_type_poly(poly_type: list[str]) -> list[float]:
     '''
@@ -225,15 +227,13 @@ def solve_xn_routes(multA, n) -> list[XI]:
 
 def check_without_dcmp(made_powers: set[int], coeff: list[float]) -> bool:
     '''
-    Check whether polynomial can be evaluated without decompositon.
+    Check whether polynomial can be evaluated without cmult.
     '''
-    flag = True
     for i, coef in enumerate(coeff):
         if coef != 0:
             if i not in made_powers:
-                flag = False
-    
-    return flag
+                return False
+    return True
 
 def attach(d1: Poly | XI | None, c1: Complexity, d2: Poly, c2: Complexity, attach_type: str) -> Complexity:
     '''
@@ -242,10 +242,11 @@ def attach(d1: Poly | XI | None, c1: Complexity, d2: Poly, c2: Complexity, attac
     res = Complexity()
     if attach_type == 'x': # Mult
         # d2 = constant
-        if d2.deg == 0 and d2.coeff_type[0] == "F":
+        if d2.deg == 0:
             res = c1
-            res.depth += 1
-            res.pmult += 1
+            add_mult = 1 if (d2.coeff_type[0] == "F" and d2.coeff[0] != 0) else 0
+            res.depth += add_mult
+            res.pmult += add_mult
 
         # normal poly*poly
         elif type(d1) == Poly:
@@ -262,9 +263,8 @@ def attach(d1: Poly | XI | None, c1: Complexity, d2: Poly, c2: Complexity, attac
             res.pmult = c1.pmult + c2.pmult
             res.add = c1.add + c2.add
             
-        
     elif attach_type == '+': # Add
-        if d2.deg == 0:
+        if d2.deg == 0 and d2.coeff[0] == 0.0:
             return c1
         res.depth = max(c1.depth, c2.depth)
         res.cmult = c1.cmult + c2.cmult

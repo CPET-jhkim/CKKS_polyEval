@@ -3,6 +3,7 @@ __pycache__/
 
 # Leagcy code folder
 legacy/
+deprecated/
 
 # All text files
 *.txt
