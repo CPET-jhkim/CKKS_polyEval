@@ -132,7 +132,7 @@ class Decomp:
         
     def __lt__(self, other):
         # return (self.comp, int(self.xi.multA), self.check_depth()) < (other.comp, int(other.xi.multA), other.check_depth())
-        return (self.comp, int(self.xi.multA), self.xi.n) < (other.comp, int(other.xi.multA), self.xi.n)
+        return (self.comp, int(self.xi.multA), self.xi.n) < (other.comp, int(other.xi.multA), other.xi.n)
 
     def __eq__(self, other):
         # return (self.comp, self.xi.multA, self.check_depth()) == (other.comp, other.xi.multA, other.check_depth())
@@ -160,37 +160,9 @@ class Decomp:
         # q(x)
         if self.dcmp_q is not None:
             res += f" + ({self.dcmp_q.restore_dcmp()})"
-            
-        # attach
-        # res = ""
-        # if xi_str != "":
-        #     res += xi_str
-        # if px_str != "":
-        #     res += f"({px_str})"
-        # if qx_str != "":
-        #     res += f"+ ({qx_str})"
+
         return res
 
-        if self.coeff == []:
-            return ""
-        # i=0
-        if self.dcmp_p is None and self.dcmp_q is None:
-            return poly_to_str(self.coeff) # vector to string
-        else:
-            coeff_p = self.dcmp_p.coeff
-            coeff_q = self.dcmp_q.coeff
-            if self.xi.multA and coeff_p:
-                leading_coeff = coeff_p[-1]
-                if leading_coeff != 0:
-                    coeff_p = [c / leading_coeff for c in coeff_p]
-            coeff = f"{self.coeff[-1]}" if self.xi.multA else ""
-            if self.xi.n == 1:
-                res = f"{coeff}x"
-            else:
-                res = f"{coeff}x^{self.xi.n}"
-            
-            q = f" + ({self.dcmp_q.restore_dcmp()})" if coeff_q != [] else ""
-            return f"({res})[ {self.dcmp_p.restore_dcmp()} ]{q}" 
 
     def merge_mp(self):
         mp2 = self.dcmp_p.merge_mp() if self.dcmp_p is not None else {0, 1}
@@ -222,22 +194,31 @@ class Decomp:
 
         return res
     
+    # def check_depth(self) -> int:
+    #     res = 1
+    #     if self.xi.n != 0:
+    #         res += ceil(log2(self.xi.n+1))
+
+    #     pDepth = 0
+    #     qDepth = 0
+    #     if self.dcmp_p is not None:
+    #         pDepth = self.dcmp_p.check_depth()
+    #     if self.dcmp_q is not None:
+    #         qDepth = self.dcmp_q.check_depth()
+            
+    #     return res+max(pDepth, qDepth)
     def check_depth(self) -> int:
         res = 1
-        if self.xi.n != 0:
-            res += ceil(log2(self.xi.n+1))
-
-        pDepth = 0
-        qDepth = 0
-        if self.dcmp_p is not None:
-            pDepth = self.dcmp_p.check_depth()
-        if self.dcmp_q is not None:
-            qDepth = self.dcmp_q.check_depth()
+        dp = 0
+        dq = 0
+        if self.dcmp_p:
+            dp = self.dcmp_p.check_depth()
+        if self.dcmp_q:
+            dq = self.dcmp_q.check_depth()
+        return res + max(dp, dq)
             
-        return res+max(pDepth, qDepth)
-    
-def NULL_DECOMP():
-    return Decomp([], Complexity(), XI())
+            
+NULL_DECOMP = Decomp([], Complexity(), XI())
     
     
         
