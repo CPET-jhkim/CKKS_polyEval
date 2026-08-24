@@ -4,7 +4,9 @@ try:
 except:
     from .print import poly_to_str, print_poly, print_poly_type
 from math import log2, ceil
+from functools import total_ordering
 
+@total_ordering
 class Complexity:
     '''
     Calculation complexity class
@@ -12,7 +14,7 @@ class Complexity:
     def __init__(self, xi = None):
         if xi is not None:
             self.depth = xi.depth
-            self.cmult = xi.add_count
+            self.cmult = xi.cmult
             self.pmult = xi.pmult
             self.add = 0
         else:
@@ -36,6 +38,9 @@ class Complexity:
     
     def print_params(self):
         print(f"{'DCPA:':<8}{self.depth}|{self.cmult}|{self.pmult}|{self.add}")
+    
+    def return_params(self):
+        return f"{self.depth}|{self.cmult}|{self.pmult}|{self.add}"
         
 class Poly:
     '''
@@ -97,38 +102,58 @@ class XI:
         self.multA = multA
         self.n = n
         self.made_powers = {0, 1}
-        self.add_count = 0
+        # self.add_count = 0
+        self.depth = 0
+        self.pmult = 0
+        self.cmult = 0
         self.route = []
-        val = 1 if multA else 0
-        try:
-            self.depth = ceil(log2(n + val))
-        except Exception as e:
-            self.depth = 0
-        self.pmult = val
+        # (kind, lhs, rhs). kind in {"pure", "coeff", "coeff_direct"}
+        self.route_ops = []
+        # val = 1 if multA else 0
+        # try:
+        #     self.depth = ceil(log2(n + val))
+        # except Exception as e:
+        #     self.depth = 0
+        # self.pmult = val
         
-    def add_routes(self, route, made_powers):
-        self.route = route
-        self.add_count = len(route)
-        self.made_powers = made_powers
+    def add_routes(self, route, depth, pmult, cmult, made_powers, route_ops=None):
+        self.route = [tuple(r) for r in route]
+        self.depth = depth
+        self.pmult = pmult
+        self.cmult = cmult
+        self.made_powers = set(made_powers)
+
+        if route_ops is None:
+            # 구버전 호출과의 호환성. 명시 정보가 없으면 순수 power route로 간주한다.
+            self.route_ops = [("pure", int(a), int(b)) for a, b in self.route]
+        else:
+            self.route_ops = [
+                (str(kind), int(a), int(b))
+                for kind, a, b in route_ops
+            ]
     
     def print_params(self):
-        print(f"XI(n={self.n}, multA={self.multA}, count={self.add_count}, route={self.route})")
+        print(f"XI(n={self.n}, multA={self.multA}, DCP={self.depth}/{self.cmult}/{self.pmult}, route={self.route})")
 
 
 class Decomp:
-    def __init__(self, coeff: list[float], comp: Complexity, xi=XI()):
+    def __init__(self, coeff: list[float], comp: Complexity, xi=None):
         self.coeff = coeff
         self.comp = comp
-        self.xi = xi
+        self.xi = xi if xi is not None else XI()
         self.dcmp_p = None
         self.dcmp_q = None
-        self.made_powers = self.xi.made_powers
-        
+        self.made_powers = set(self.xi.made_powers)
+        # terminal, p_only, q_only, p_then_q, q_then_p
+        self.eval_order = "terminal"
+        # 말단 다항식의 항별 평가계획. 각 항은 degree/coeff_type/multA/route_ops를 가진다.
+        self.term_plans = []
+
     def update(self, xi: XI, dcmp_p, dcmp_q):
         self.xi = xi
         self.dcmp_p = dcmp_p
         self.dcmp_q = dcmp_q
-        self.made_powers |= xi.made_powers
+        self.made_powers = set(xi.made_powers)
         
     def __lt__(self, other):
         # return (self.comp, int(self.xi.multA), self.check_depth()) < (other.comp, int(other.xi.multA), other.check_depth())

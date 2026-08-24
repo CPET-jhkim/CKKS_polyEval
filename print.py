@@ -13,8 +13,7 @@ def print_poly_sep(i: int, poly_p: list[float], poly_q: list[float]) -> None:
     print_poly(poly_p, "")
     print("}", end='')
     print_poly(poly_q, "")
-    
-    
+        
 # def pp(poly: list[float]) -> str:
 #     '''
 #     Converts polynomial into string.

@@ -10,145 +10,316 @@ def get_poly_type_key(poly_type: list) -> str:
         poly_type = Poly(poly_type).coeff_type
     return "".join(poly_type)
 
-# 분해식 데이터를 dict형으로 직렬화
-def serialize_decomp(dcmp: Decomp) -> dict | None:
-    if dcmp is None:
-        return None
-    
-    # 더 이상 분해되지 않는 말단 노드(Base case) 처리
-    # xi.n이 0이거나 coeff가 비어있을 경우 등 로직에 맞게 조정
-    if dcmp.xi.n == 0 and dcmp.dcmp_p is None:
-        return {
-            "is_leaf": True,
-            "xi": None
-        }
 
+
+
+CACHE_SCHEMA_VERSION = 2
+
+
+def serialize_route_ops(route_ops) -> list[dict]:
+    return [
+        {
+            "kind": str(kind),
+            "lhs": int(lhs),
+            "rhs": int(rhs),
+        }
+        for kind, lhs, rhs in route_ops
+    ]
+
+
+def deserialize_route_ops(raw_ops) -> list[tuple[str, int, int]]:
+    result = []
+    for index, op in enumerate(raw_ops or []):
+        if not isinstance(op, dict):
+            raise ValueError(
+                f"route_ops[{index}] must be an object"
+            )
+        kind = op.get("kind")
+        if kind not in {"pure", "coeff", "coeff_direct"}:
+            raise ValueError(
+                f"route_ops[{index}] has invalid kind: {kind}"
+            )
+        result.append(
+            (
+                kind,
+                int(op.get("lhs", 0)),
+                int(op.get("rhs", 0)),
+            )
+        )
+    return result
+
+
+def serialize_term_plan(plan: dict) -> dict:
     return {
-        "is_leaf": False,
-        "xi": {
-            "n": dcmp.xi.n,
-            "multA": dcmp.xi.multA,
-            "route": dcmp.xi.route  # XI 복원을 위해 경로 저장
-        },
-        "p": serialize_decomp(dcmp.dcmp_p),
-        "q": serialize_decomp(dcmp.dcmp_q)
+        "degree": int(plan["degree"]),
+        "coeff_type": str(plan["coeff_type"]),
+        "multA": bool(plan["multA"]),
+        "route_ops": serialize_route_ops(plan["route_ops"]),
     }
 
-# 저장한 데이터로 탐색 없이 복원
-def reconstruct_decomp(plan: dict, poly: Poly | list | np.ndarray, depth: int = 0) -> Decomp:
-    indent = "  " * depth
-    
-    # 0. 입력 데이터 타입 방어 코드
-    try:
-        if plan is None:
-            raise ValueError("Plan is None")
-            
-        # poly가 list나 ndarray면 Poly 객체로 변환
-        if not isinstance(poly, Poly):
-            poly = Poly(poly)
-    except Exception as e:
-        print(f"{indent}[Error] Input Validation Failed at depth {depth}")
-        print(f"{indent}Poly type: {type(poly)}")
-        print(f"{indent}Plan: {plan}")
-        raise e
 
-    try:
-        # --- 디버깅용 로그 (필요 없으면 주석 처리) ---
-        # print(f"{indent}> Reconstruct Start: deg={poly.deg}, coeff={poly.coeff}")
+def deserialize_term_plan(plan: dict) -> dict:
+    if not isinstance(plan, dict):
+        raise ValueError("term plan must be an object")
+    return {
+        "degree": int(plan["degree"]),
+        "coeff_type": str(plan["coeff_type"]),
+        "multA": bool(plan.get("multA", False)),
+        "route_ops": deserialize_route_ops(
+            plan.get("route_ops", [])
+        ),
+    }
 
-        # 1. Base Case: 더 이상 분해되지 않는 경우 (Leaf)
-        if plan.get("is_leaf", False):
-            # 기본 Complexity 생성 (Leaf 노드용)
-            # 주의: Leaf 노드일 때도 기본 연산 비용이 있다면 계산 로직 필요
-            # 여기서는 기본값으로 처리
-            res = Decomp(poly.coeff, Complexity(), XI()) 
-            res.made_powers = {0, 1}
-            return res
 
-        # 2. 구조 정보 복원 (XI)
-        plan_xi = plan.get("xi")
-        if not plan_xi:
-            raise ValueError(f"Missing 'xi' in plan at depth {depth}")
+def serialize_complexity(comp: Complexity) -> dict:
+    return {
+        "depth": int(comp.depth),
+        "cmult": int(comp.cmult),
+        "pmult": int(comp.pmult),
+        "add": int(comp.add),
+    }
 
-        xi = XI(plan_xi.get("multA", False), plan_xi.get("n", 1))
-        
-        # made_powers 복원
-        made_powers = {0, 1}
-        raw_routes = plan_xi.get("route", [])
-        routes = [tuple(r) for r in raw_routes]            
-        for op in routes:
-            # op가 리스트인지 튜플인지 확인하여 안전하게 합계 계산
-            # val = sum(op) if isinstance(op, (list, tuple)) else op
-            made_powers.add(sum(op))
-        
-        # XI 객체에 route 정보 주입
-        if hasattr(xi, 'add_routes'):
-            xi.add_routes(routes, made_powers)
-        else:
-            xi.route = routes # fallback
 
-        # 3. 다항식 분리
-        # seperate 메서드가 실패하지 않도록 try 감싸기
-        try:
-            poly_p, poly_q = poly.seperate(xi.n, xi.multA)
-        except Exception as sep_err:
-            print(f"{indent}[Error] Separation failed: xi.n={xi.n}, multA={xi.multA}")
-            raise sep_err
+def deserialize_complexity(raw: dict | None) -> Complexity:
+    comp = Complexity()
+    if not raw:
+        return comp
+    comp.insert_value(
+        int(raw.get("depth", 0)),
+        int(raw.get("cmult", 0)),
+        int(raw.get("pmult", 0)),
+        int(raw.get("add", 0)),
+    )
+    return comp
 
-        # 4. 재귀적 복원
-        dcmp_p = None
-        dcmp_q = None
 
-        # P 복원 (P는 보통 존재해야 함)
-        if plan.get("p"):
-            dcmp_p = reconstruct_decomp(plan["p"], poly_p, depth + 1)
-        else:
-            # Plan에는 없는데 Poly P가 비어있지 않다면 문제
-            if poly_p.coeff and poly_p.deg >= 0:
-                print(f"{indent}[Warning] Plan for P is missing but Poly P exists: {poly_p.coeff}")
+def serialize_xi(xi: XI | None) -> dict | None:
+    if xi is None:
+        return None
 
-        # Q 복원 (Q는 없을 수 있음)
-        if poly_q.coeff and plan.get("q"):
-            dcmp_q = reconstruct_decomp(plan["q"], poly_q, depth + 1)
-        
-        # 5. Complexity 병합
-        comp_i = Complexity()
-        comp_i.insert_value(xi.depth, xi.add_count, xi.pmult, 0)
+    return {
+        "n": int(xi.n),
+        "multA": bool(xi.multA),
+        # 구버전 reader 확인용으로 유지한다.
+        "route": [
+            [int(lhs), int(rhs)]
+            for lhs, rhs in xi.route
+        ],
+        "route_ops": serialize_route_ops(xi.route_ops),
+        "made_powers": sorted(
+            int(power) for power in xi.made_powers
+        ),
+        "depth": int(xi.depth),
+        "cmult": int(xi.cmult),
+        "pmult": int(xi.pmult),
+    }
 
-        # p_comp 안전하게 가져오기
-        p_comp = dcmp_p.comp if dcmp_p else Complexity()
-        
-        # attach 함수 호출
-        # (attach 함수가 None을 처리하지 못할 경우를 대비해 p_comp 전달)
-        comp_pi = attach(xi, comp_i, poly_p, p_comp, 'x')
-        
-        comp_piq = comp_pi
-        if dcmp_q:
-            comp_piq = attach(None, comp_pi, poly_q, dcmp_q.comp, '+')
 
-        # 6. 최종 결과 생성
-        res = Decomp(poly.coeff, comp_piq)
-        res.update(xi, dcmp_p, dcmp_q)
-        
-        # made_powers 병합
-        res.made_powers = res.merge_mp()
-        
-        return res
+def deserialize_xi(
+    raw: dict | None,
+    incoming_powers: set[int],
+) -> XI:
+    if raw is None:
+        xi = XI()
+        xi.add_routes(
+            [],
+            0,
+            0,
+            0,
+            set(incoming_powers),
+            route_ops=[],
+        )
+        return xi
 
-    except Exception as e:
-        # 에러 발생 시 상세 문맥 출력
-        print(f"\n{'='*20} CRITICAL ERROR at Depth {depth} {'='*20}")
-        print(f"{indent}Error Type: {type(e).__name__}")
-        print(f"{indent}Message: {e}")
-        print(f"{indent}Current Poly Coeff: {poly.coeff}")
-        print(f"{indent}Current XI Plan: {plan.get('xi', 'Missing')}")
-        
-        # Traceback 출력 (선택 사항)
-        # traceback.print_exc() 
-        
-        # 상위 호출 스택으로 에러 전파
-        raise e
+    route_ops = deserialize_route_ops(raw.get("route_ops", []))
 
+    # schema v1 호환: route_ops가 없으면 기존 route를 pure로 간주한다.
+    if not route_ops:
+        route_ops = [
+            ("pure", int(lhs), int(rhs))
+            for lhs, rhs in raw.get("route", [])
+        ]
+
+    routes = [(lhs, rhs) for _, lhs, rhs in route_ops]
+    available = set(incoming_powers)
+
+    for index, (kind, lhs, rhs) in enumerate(route_ops):
+        if lhs not in available:
+            raise ValueError(
+                f"route_ops[{index}] uses unavailable x^{lhs}"
+            )
+        if rhs not in available:
+            raise ValueError(
+                f"route_ops[{index}] uses unavailable x^{rhs}"
+            )
+        if kind == "pure":
+            available.add(lhs + rhs)
+
+    stored_made_powers = {
+        int(power)
+        for power in raw.get("made_powers", [])
+    }
+    if stored_made_powers:
+        available |= stored_made_powers
+
+    xi = XI(
+        bool(raw.get("multA", False)),
+        int(raw.get("n", 0)),
+    )
+    xi.add_routes(
+        routes,
+        int(raw.get("depth", 0)),
+        int(raw.get("pmult", 0)),
+        int(raw.get("cmult", 0)),
+        available,
+        route_ops=route_ops,
+    )
+    return xi
+
+
+def serialize_decomp(dcmp: Decomp | None) -> dict | None:
+    if dcmp is None:
+        return None
+
+    is_leaf = (
+        dcmp.dcmp_p is None
+        and dcmp.dcmp_q is None
+    )
+
+    return {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "is_leaf": is_leaf,
+        "eval_order": str(dcmp.eval_order),
+        "complexity": serialize_complexity(dcmp.comp),
+        "xi": serialize_xi(dcmp.xi),
+        "term_plans": [
+            serialize_term_plan(plan)
+            for plan in dcmp.term_plans
+        ],
+        "p": (
+            None
+            if is_leaf
+            else serialize_decomp(dcmp.dcmp_p)
+        ),
+        "q": (
+            None
+            if is_leaf
+            else serialize_decomp(dcmp.dcmp_q)
+        ),
+    }
+
+
+def reconstruct_decomp(
+    plan: dict,
+    poly: Poly | list | np.ndarray,
+    incoming_powers: set[int] | None = None,
+    depth: int = 0,
+) -> Decomp:
+    """schema v2 캐시를 탐색 없이 Python Decomp로 복원한다."""
+    if not isinstance(plan, dict):
+        raise ValueError(
+            f"Invalid plan at depth {depth}: not an object"
+        )
+
+    if not isinstance(poly, Poly):
+        poly = Poly(poly)
+
+    if incoming_powers is None:
+        incoming_powers = {0, 1}
+    else:
+        incoming_powers = set(incoming_powers)
+
+    xi = deserialize_xi(
+        plan.get("xi"),
+        incoming_powers,
+    )
+    comp = deserialize_complexity(plan.get("complexity"))
+
+    result = Decomp(poly.coeff, comp, xi)
+    result.eval_order = plan.get("eval_order", "terminal")
+    result.term_plans = [
+        deserialize_term_plan(item)
+        for item in plan.get("term_plans", [])
+    ]
+
+    if plan.get("is_leaf", False):
+        return result
+
+    if xi.n == 0 and not xi.multA:
+        raise ValueError(
+            f"Invalid non-leaf xi at depth {depth}: n == 0"
+        )
+
+    poly_p, poly_q = poly.seperate(xi.n, xi.multA)
+    current_powers = set(xi.made_powers)
+    dcmp_p = None
+    dcmp_q = None
+
+    order = result.eval_order
+
+    if order in {"q_then_p", "q_only"}:
+        if not poly_q.is_empty():
+            q_plan = plan.get("q")
+            if q_plan is None:
+                raise ValueError(
+                    f"Missing q plan at depth {depth}"
+                )
+            dcmp_q = reconstruct_decomp(
+                q_plan,
+                poly_q,
+                current_powers,
+                depth + 1,
+            )
+            current_powers |= dcmp_q.merge_mp()
+
+        if order != "q_only" and not poly_p.is_empty():
+            p_plan = plan.get("p")
+            if p_plan is None:
+                raise ValueError(
+                    f"Missing p plan at depth {depth}"
+                )
+            dcmp_p = reconstruct_decomp(
+                p_plan,
+                poly_p,
+                current_powers,
+                depth + 1,
+            )
+    else:
+        if not poly_p.is_empty():
+            p_plan = plan.get("p")
+            if p_plan is None:
+                raise ValueError(
+                    f"Missing p plan at depth {depth}"
+                )
+            dcmp_p = reconstruct_decomp(
+                p_plan,
+                poly_p,
+                current_powers,
+                depth + 1,
+            )
+            current_powers |= dcmp_p.merge_mp()
+
+        if order != "p_only" and not poly_q.is_empty():
+            q_plan = plan.get("q")
+            if q_plan is None:
+                raise ValueError(
+                    f"Missing q plan at depth {depth}"
+                )
+            dcmp_q = reconstruct_decomp(
+                q_plan,
+                poly_q,
+                current_powers,
+                depth + 1,
+            )
+
+    result.update(xi, dcmp_p, dcmp_q)
+    result.eval_order = order
+    result.term_plans = [
+        deserialize_term_plan(item)
+        for item in plan.get("term_plans", [])
+    ]
+    result.made_powers = result.merge_mp()
+    return result
 
 # 전역 변수 혹은 클래스 멤버로 캐시 로드
 def load_cache(CACHE_FILE: str):
@@ -192,9 +363,9 @@ if __name__ == '__main__':
     # nohup /home/doodle/.virtualenvs/remez/bin/python /home/doodle/python/py_approx_test/polyEval/save.py > /dev/null 2>&1 &
     # n~m차까지 모든 다항식 타입에 대하여 저장
     load_filename = 'data/decomp_cache.json'
-    save_filename = 'data/decomp_cache0408.json'
+    save_filename = 'data/decomp_cache.json'
     dcmp_cache = load_cache(load_filename)
-    for deg in range(9, 30):
+    for deg in range(1, 9):
         polys = make_all_polys(deg)
         total_polys = len(polys)
         
@@ -203,7 +374,7 @@ if __name__ == '__main__':
         try:
             future_to_key = {}
             # 에러 발생 시 즉시 중단을 위해 context manager 내에서 엄격하게 관리
-            with ProcessPoolExecutor(max_workers=1) as executor:
+            with ProcessPoolExecutor(max_workers=30) as executor:
                 # 1. 태스크 제출
                 for coeff in polys:
                     key = get_poly_type_key(coeff)
