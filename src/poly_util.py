@@ -2,10 +2,7 @@
 import random
 from itertools import product
 from math import log2, ceil
-try:
-    from basic_class import Complexity, Poly, XI, Decomp
-except:
-    from .basic_class import Complexity, Poly, XI, Decomp
+from .basic_class import Complexity, Poly, XI, Decomp
 
 def _make_int_coef(i: int) -> float:
     return float(i + 1)
@@ -32,35 +29,19 @@ def make_type_poly(poly_type: list[str]) -> list[float]:
 
     return poly
 
+def make_all_poly_types(max_deg: int) -> list[list[str]]:
+    '''Return every 0/I/F coefficient-type case of exact degree max_deg.'''
+    if max_deg < 1:
+        raise ValueError("max_deg must be at least 1.")
+    return [list(combo) for combo in product(*([['0', 'I', 'F']] * max_deg + [['I', 'F']]))]
+
+
 def make_all_polys(max_deg: int) -> list[list[float]]:
     '''
     Create every possible polynomial of degree n.
     Coefficient type can be 0/I/F.(Max degree can't be 0.)
     '''
-    assert max_deg >= 1
-
-    types_middle = ["0", "I", "F"]
-    types_highest = ["I", "F"]
-
-    iterables = [types_middle] * max_deg + [types_highest]
-
-    type_combinations = product(*iterables)
-
-    all_polys = []
-    for combo in type_combinations:
-        poly_values = []
-
-        for i, ctype in enumerate(combo):
-            if ctype == "0":
-                poly_values.append(0.0)
-            elif ctype == "I":
-                poly_values.append(_make_int_coef(i))
-            elif ctype == "F":
-                poly_values.append(_make_float_coef(i))
-
-        all_polys.append(poly_values)
-
-    return all_polys
+    return [make_type_poly(poly_type) for poly_type in make_all_poly_types(max_deg)]
 
 def make_deg_poly(deg: int, type: str) -> list[float]:
     """
@@ -134,15 +115,28 @@ def print_dcmp_detail(dcmp: Decomp, step: int):
         print_dcmp_detail(dcmp.dcmp_q, step+1)
 
 
-def solve_xn_routes(multA, n, made_powers=None) -> list[XI]:
+def solve_xn_routes(multA, n, made_powers=None, minimize_cmult=True) -> list[XI]:
     """
-    기존에 생성한 x^i들을 활용하여 (a)x^n을 구성하는 최소 경로들을 탐색한다.
+    기능:
+        기존에 생성한 x^i를 활용하여 x^n 또는 ax^n을 최소 depth로 구성하는
+        경로를 탐색한다. 필요하면 최소 CMult 가지치기를 적용하지 않고 같은
+        최소 depth를 만족하는 모든 경로를 반환한다.
+    입력:
+        multA: False이면 x^n, True이면 ax^n 생성 여부.
+        n: 생성할 목표 차수.
+        made_powers: 현재 재사용 가능한 순수 x^i 차수 집합.
+        minimize_cmult: True이면 최소 CMult 경로만, False이면 최소 depth의
+            모든 경로를 유지한다.
+    출력:
+        선택한 가지치기 조건을 만족하는 XI 객체 목록.
 
     Rules:
         - made_powers는 순수 power x^k만 추적한다.
         - coefficient route는 순수 x^(a+b)를 만들지 않으므로 made_powers에 추가하지 않는다.
         - multA=True이고 x^n이 이미 존재하면 a * x^n도 고려한다.
         - multA=True이고 x^n이 아직 없더라도, x^n을 만든 뒤 a * x^n 하는 fallback도 고려한다.
+        - minimize_cmult=True이면 최소 depth 후보 중 CMult가 최소인 경로만 남긴다.
+        - minimize_cmult=False이면 최소 depth를 만족하는 모든 경로를 남긴다.
         - 최종적으로 같은 route/depth/pmult/cmult 후보가 있으면 made_powers가 더 큰 후보만 남긴다.
     """
     from math import ceil, log2
@@ -424,7 +418,11 @@ def solve_xn_routes(multA, n, made_powers=None) -> list[XI]:
         if c["depth"] == min_depth
     ]
 
-    min_ops_count = min(len(c["ops"]) for c in candidates)
+    min_ops_count = (
+        min(len(c["ops"]) for c in candidates)
+        if minimize_cmult
+        else None
+    )
 
     kind_order = {
         "pure": 0,
@@ -437,7 +435,7 @@ def solve_xn_routes(multA, n, made_powers=None) -> list[XI]:
     for cand in candidates:
         ops_set = cand["ops"]
 
-        if len(ops_set) > min_ops_count:
+        if min_ops_count is not None and len(ops_set) > min_ops_count:
             continue
 
         sorted_internal_route = sorted(
@@ -536,6 +534,220 @@ def solve_xn_routes(multA, n, made_powers=None) -> list[XI]:
         final_xi_list.append(xi_obj)
 
     return final_xi_list
+
+
+def _normalize_power_depths(power_cache) -> dict[int, int]:
+    '''
+    기능:
+        set 또는 power-depth dictionary 입력을 실제 depth dictionary로 정규화한다.
+    입력:
+        power_cache: 순수 power 집합 또는 {power: depth} dictionary.
+    출력:
+        x^0, x^1을 포함하는 {power: actual depth} dictionary.
+    '''
+    if isinstance(power_cache, dict):
+        result = {
+            int(power): int(power_depth)
+            for power, power_depth in power_cache.items()
+        }
+    else:
+        result = {
+            int(power): ceil(log2(power)) if power > 1 else 0
+            for power in set(power_cache or set())
+        }
+    result.setdefault(0, 0)
+    result.setdefault(1, 0)
+    return result
+
+
+def solve_xn_routes_depth_limited(multA: bool, n: int, made_powers: set[int] | dict[int, int] | None = None, max_depth: int | None = None) -> list[XI]:
+    '''
+    기능:
+        입력 power의 실제 depth에서 시작하여 최종 목표 depth가 max_depth 이하인
+        x^n 또는 ax^n의 모든 비중복 multiplication DAG를 탐색한다. 중간 power는
+        자체 최소 depth를 초과할 수 있다.
+    입력:
+        multA: False이면 x^n, True이면 ax^n 생성 여부.
+        n: 생성할 목표 차수.
+        made_powers: 현재 순수 power 집합 또는 각 power의 실제 depth dictionary.
+        max_depth: 최종 목표에 허용할 최대 multiplicative depth. None이면 제한하지 않는다.
+    출력:
+        최종 목표 depth가 max_depth 이하인 서로 다른 XI 객체 목록.
+    '''
+    from functools import lru_cache
+
+    if n <= 0:
+        return []
+
+    base_power_depths = _normalize_power_depths(made_powers)
+
+    @lru_cache(maxsize=None)
+    def pure_paths(target: int) -> tuple[frozenset, ...]:
+        '''
+        기능: 목표 x^target에 기여하는 모든 비중복 pure multiplication DAG를 생성한다.
+        입력: target은 생성할 순수 power 차수이다.
+        출력: 상세 연산 tuple 집합을 원소로 갖는 tuple이다.
+        '''
+        paths = set()
+        if target in base_power_depths:
+            paths.add(frozenset())
+
+        for lhs in range(1, target // 2 + 1):
+            rhs = target - lhs
+            for left_ops in pure_paths(lhs):
+                for right_ops in pure_paths(rhs):
+                    paths.add(
+                        frozenset(
+                            set(left_ops)
+                            | set(right_ops)
+                            | {("pure", lhs, rhs)}
+                        )
+                    )
+        return tuple(paths)
+
+    @lru_cache(maxsize=None)
+    def coeff_paths(target: int) -> tuple[frozenset, ...]:
+        '''
+        기능: 목표 ax^target에 기여하는 모든 비중복 coefficient DAG를 생성한다.
+        입력: target은 생성할 coefficient-bearing power 차수이다.
+        출력: 상세 연산 tuple 집합을 원소로 갖는 tuple이다.
+        '''
+        paths = set()
+        for pure_ops in pure_paths(target):
+            paths.add(
+                frozenset(
+                    set(pure_ops)
+                    | {("coeff_direct", 0, target)}
+                )
+            )
+
+        for coeff_power in range(1, target):
+            pure_power = target - coeff_power
+            for coeff_ops in coeff_paths(coeff_power):
+                for pure_ops in pure_paths(pure_power):
+                    paths.add(
+                        frozenset(
+                            set(coeff_ops)
+                            | set(pure_ops)
+                            | {("coeff", coeff_power, pure_power)}
+                        )
+                    )
+        return tuple(paths)
+
+    def evaluate_ops(ops: frozenset) -> tuple | None:
+        '''
+        기능: 연산 DAG를 실제 power depth로 평가하고 depth 제한을 검사한다.
+        입력: ops는 kind/lhs/rhs 연산으로 구성된 frozenset이다.
+        출력: 유효하면 route/depth/cmult/power-depth tuple, 아니면 None이다.
+        '''
+        kind_order = {
+            "pure": 0,
+            "coeff_direct": 1,
+            "coeff": 2,
+        }
+        route_ops = sorted(
+            ops,
+            key=lambda op: (
+                op[1] + op[2],
+                kind_order.get(op[0], 99),
+                op[1],
+                op[2],
+            ),
+        )
+        pure_depths = dict(base_power_depths)
+        coeff_depths = {}
+        generated_pure = set()
+
+        for kind, lhs, rhs in route_ops:
+            if kind == "pure":
+                target = lhs + rhs
+                if lhs not in pure_depths or rhs not in pure_depths:
+                    return None
+                if target in generated_pure:
+                    return None
+                generated_depth = max(
+                    pure_depths[lhs],
+                    pure_depths[rhs],
+                ) + 1
+                if (
+                    target in pure_depths
+                    and generated_depth >= pure_depths[target]
+                ):
+                    return None
+                pure_depths[target] = generated_depth
+                generated_pure.add(target)
+            elif kind == "coeff_direct":
+                if rhs not in pure_depths or rhs in coeff_depths:
+                    return None
+                coeff_depths[rhs] = pure_depths[rhs] + 1
+            elif kind == "coeff":
+                target = lhs + rhs
+                if lhs not in coeff_depths or rhs not in pure_depths:
+                    return None
+                if target in coeff_depths:
+                    return None
+                coeff_depths[target] = max(
+                    coeff_depths[lhs],
+                    pure_depths[rhs],
+                ) + 1
+            else:
+                return None
+
+        target_depths = coeff_depths if multA else pure_depths
+        if n not in target_depths:
+            return None
+
+        depth = target_depths[n]
+        if max_depth is not None and depth > max_depth:
+            return None
+
+        cmult = sum(
+            1
+            for kind, _, _ in route_ops
+            if kind != "coeff_direct"
+        )
+        return route_ops, depth, cmult, pure_depths
+
+    raw_paths = coeff_paths(n) if multA else pure_paths(n)
+    results = []
+    seen = set()
+    for ops in raw_paths:
+        evaluated = evaluate_ops(ops)
+        if evaluated is None:
+            continue
+        route_ops, depth, cmult, power_depths = evaluated
+        signature = (
+            tuple(route_ops),
+            depth,
+            cmult,
+            tuple(sorted(power_depths.items())),
+        )
+        if signature in seen:
+            continue
+        seen.add(signature)
+
+        xi = XI(multA, n)
+        xi.add_routes(
+            [(lhs, rhs) for _, lhs, rhs in route_ops],
+            depth,
+            1 if multA else 0,
+            cmult,
+            set(power_depths),
+            route_ops=route_ops,
+            power_depths=power_depths,
+        )
+        results.append(xi)
+
+    results.sort(
+        key=lambda xi: (
+            xi.depth,
+            xi.cmult,
+            xi.pmult,
+            tuple(xi.route_ops),
+            tuple(sorted(xi.power_depths.items())),
+        )
+    )
+    return results
 
 # def solve_xn_routes(multA, n, made_powers=None) -> list[XI]:
 #     """
@@ -1037,15 +1249,13 @@ def check_without_dcmp(made_powers: set[int], coeff: list[float]) -> bool:
                 return False
     return True
 
-def check_without_dcmp_v2(
-    made_powers: set[int],
-    coeff: list[float],
-) -> tuple[
-    list[tuple[int, int]] | None,
-    list[dict] | None,
-    Complexity | None,
-    set[int] | None,
-]:
+def check_without_dcmp_v2(made_powers: set[int], coeff: list[float]
+    ) -> tuple[
+                list[tuple[int, int]] | None,
+                list[dict] | None,
+                Complexity | None,
+                set[int] | None,
+            ]:
     """
     추가 분해 없이 다항식을 평가하는 최적 terminal 계획을 생성한다.
 
@@ -1060,12 +1270,7 @@ def check_without_dcmp_v2(
             return 0
         return ceil(log2(v))
 
-    def make_term_plan(
-        degree: int,
-        coeff_type: str,
-        multA: bool,
-        route_ops,
-    ) -> dict:
+    def make_term_plan(degree: int, coeff_type: str, multA: bool, route_ops) -> dict:
         return {
             "degree": int(degree),
             "coeff_type": str(coeff_type),
@@ -1414,6 +1619,225 @@ def check_without_dcmp_v2(
 #     # 
     
     
+def check_without_dcmp_v2_all(made_powers: set[int] | dict[int, int], coeff: list[float] | list[str], max_depth: int) -> list[tuple[list[tuple[int, int]], list[dict], Complexity, dict[int, int]]]:
+    '''
+    기능:
+        추가 다항식 분해 없이 각 비영 항을 계산하는 모든 depth-feasible
+        terminal 계획을 생성한다.
+    입력:
+        made_powers: 현재 순수 x^i 집합 또는 각 power의 실제 depth dictionary.
+        coeff: 수치 계수 또는 0/I/F 계수타입 목록.
+        max_depth: terminal 계획에 허용되는 최대 multiplicative depth.
+    출력:
+        (전체 route, 항별 계획, complexity, 출력 power-depth cache) 튜플 목록.
+    '''
+    poly = Poly(coeff)
+    base_power_depths = _normalize_power_depths(made_powers)
+    required_powers = [
+        degree
+        for degree, value in enumerate(poly.coeff)
+        if degree >= 1 and value != 0
+    ]
+    add_count = len(poly.coeff_type) - poly.coeff_type.count("0") - 1
+    memo = {}
+
+    def make_plan(degree: int, coeff_type: str, multA: bool, route_ops) -> dict:
+        '''
+        기능: terminal 항 하나의 평가계획을 dictionary로 구성한다.
+        입력: 항 차수, 계수타입, ax 경로 여부, 상세 route 목록이다.
+        출력: 직렬화 가능한 항 평가계획 dictionary이다.
+        '''
+        return {
+            "degree": int(degree),
+            "coeff_type": str(coeff_type),
+            "multA": bool(multA),
+            "route_ops": [
+                (str(kind), int(lhs), int(rhs))
+                for kind, lhs, rhs in route_ops
+            ],
+        }
+
+    def plan_signature(plans: list[dict]) -> tuple:
+        '''
+        기능: terminal 계획 목록을 중복 판별용 tuple로 변환한다.
+        입력: 항 평가계획 dictionary 목록이다.
+        출력: hashable terminal 계획 signature이다.
+        '''
+        return tuple(
+            (
+                plan["degree"],
+                plan["coeff_type"],
+                plan["multA"],
+                tuple(plan["route_ops"]),
+            )
+            for plan in plans
+        )
+
+    def solve_from(pos: int, current_power_depths: dict[int, int]):
+        '''
+        기능: 현재 항 위치부터 가능한 모든 terminal power 생성조합을 재귀 탐색한다.
+        입력: 항 위치와 현재 power-depth cache이다.
+        출력: 나머지 항 계획, complexity, 출력 power-depth cache 목록이다.
+        '''
+        state_key = (pos, tuple(sorted(current_power_depths.items())))
+        if state_key in memo:
+            return memo[state_key]
+
+        if pos >= len(required_powers):
+            comp = Complexity()
+            result = [([], comp, dict(current_power_depths))]
+            memo[state_key] = result
+            return result
+
+        degree = required_powers[pos]
+        coeff_type = poly.coeff_type[degree]
+        term_candidates = []
+
+        if degree in current_power_depths:
+            depth = current_power_depths[degree]
+            pmult = 1 if coeff_type == "F" else 0
+            comp = Complexity()
+            comp.insert_value(depth + pmult, 0, pmult, 0)
+            term_candidates.append((
+                make_plan(degree, coeff_type, False, []),
+                comp,
+                dict(current_power_depths),
+            ))
+
+            if coeff_type == "F":
+                for xi in solve_xn_routes_depth_limited(
+                    True,
+                    degree,
+                    current_power_depths,
+                    max_depth,
+                ):
+                    comp = Complexity()
+                    comp.insert_value(
+                        xi.depth,
+                        xi.cmult,
+                        xi.pmult,
+                        0,
+                    )
+                    if comp.depth <= max_depth:
+                        term_candidates.append((
+                            make_plan(degree, coeff_type, True, xi.route_ops),
+                            comp,
+                            dict(xi.power_depths),
+                        ))
+        else:
+            for xi in solve_xn_routes_depth_limited(
+                False,
+                degree,
+                current_power_depths,
+                max_depth,
+            ):
+                pmult = 1 if coeff_type == "F" else 0
+                comp = Complexity()
+                comp.insert_value(
+                    xi.depth + pmult,
+                    xi.cmult,
+                    xi.pmult + pmult,
+                    0,
+                )
+                if comp.depth <= max_depth:
+                    term_candidates.append((
+                        make_plan(degree, coeff_type, False, xi.route_ops),
+                        comp,
+                        dict(xi.power_depths),
+                    ))
+
+            if coeff_type == "F":
+                for xi in solve_xn_routes_depth_limited(
+                    True,
+                    degree,
+                    current_power_depths,
+                    max_depth,
+                ):
+                    comp = Complexity()
+                    comp.insert_value(
+                        xi.depth,
+                        xi.cmult,
+                        xi.pmult,
+                        0,
+                    )
+                    if comp.depth <= max_depth:
+                        term_candidates.append((
+                            make_plan(degree, coeff_type, True, xi.route_ops),
+                            comp,
+                            dict(xi.power_depths),
+                        ))
+
+        results = []
+        seen = set()
+
+        for plan, term_comp, term_power_depths in term_candidates:
+            next_power_depths = dict(current_power_depths)
+            for power, power_depth in term_power_depths.items():
+                next_power_depths[power] = min(
+                    next_power_depths.get(power, power_depth),
+                    power_depth,
+                )
+            for rest_plans, rest_comp, rest_power_depths in solve_from(
+                pos + 1,
+                next_power_depths,
+            ):
+                comp = Complexity()
+                comp.insert_value(
+                    max(term_comp.depth, rest_comp.depth),
+                    term_comp.cmult + rest_comp.cmult,
+                    term_comp.pmult + rest_comp.pmult,
+                    0,
+                )
+                if comp.depth > max_depth:
+                    continue
+
+                plans = [plan] + list(rest_plans)
+                final_power_depths = dict(next_power_depths)
+                for power, power_depth in rest_power_depths.items():
+                    final_power_depths[power] = min(
+                        final_power_depths.get(power, power_depth),
+                        power_depth,
+                    )
+                signature = (
+                    plan_signature(plans),
+                    comp.return_params(),
+                    tuple(sorted(final_power_depths.items())),
+                )
+                if signature in seen:
+                    continue
+                seen.add(signature)
+                results.append((plans, comp, final_power_depths))
+
+        memo[state_key] = results
+        return results
+
+    terminal_results = []
+    for term_plans, comp, final_power_depths in solve_from(
+        0,
+        base_power_depths,
+    ):
+        plans = list(term_plans)
+        if poly.coeff and poly.coeff[0] != 0:
+            plans.insert(
+                0,
+                make_plan(0, poly.coeff_type[0], False, []),
+            )
+        comp.add = max(add_count, 0)
+        routes = [
+            (lhs, rhs)
+            for plan in plans
+            for _, lhs, rhs in plan["route_ops"]
+        ]
+        terminal_results.append((
+            routes,
+            plans,
+            comp,
+            final_power_depths,
+        ))
+
+    return terminal_results
+
+
 def attach(d1: Poly | XI | None, c1: Complexity, d2: Poly, c2: Complexity, attach_type: str) -> Complexity:
     '''
     Attach calculation complexity
